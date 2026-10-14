@@ -3,7 +3,7 @@ name: Deploy Pages
 on:
   push:
     branches: [main]
-    paths: [versions.txt, .github/workflows/pages.yaml]
+    paths: [versions.txt, ca/verify-bundle.pem, .github/workflows/pages.yaml]
   workflow_dispatch:
 
 permissions:
@@ -21,6 +21,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install osslsigncode
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq osslsigncode
+
       - name: Download and verify signed MSIs
         env:
           GH_TOKEN: ${{ github.token }}
@@ -35,10 +38,17 @@ jobs:
               -p '*.msi' -p SHA256SUMS
             [ "$(ls "$dir"/*.msi | wc -l)" -eq 2 ]
             (cd "$dir" && grep -E 'windows-.*\.msi$' SHA256SUMS | sha256sum -c -)
-            # The signed MSIs must carry an Authenticode signature.
+            # Every MSI must carry a VALID Authenticode signature that chains to
+            # the pinned Certum CA bundle (with a verified timestamp, so it stays
+            # valid after the certificate expires) AND was made by the project's
+            # signing certificate. Merely containing a signature is not enough:
+            # this is what the Microsoft Store will fetch.
             for f in "$dir"/*.msi; do
-              LC_ALL=C grep -aqE 'D.i.g.i.t.a.l.S.i.g.n.a.t.u.r.e' "$f" \
-                || { echo "unsigned: $f"; exit 1; }
+              out=$(osslsigncode verify -CAfile ca/verify-bundle.pem \
+                      -TSA-CAfile ca/verify-bundle.pem -in "$f" 2>&1) \
+                || { echo "$out"; echo "invalid or missing signature: $f"; exit 1; }
+              grep -q 'Subject: CN=Open Source Developer Daniel Patrick Morgan,' <<<"$out" \
+                || { echo "$out"; echo "unexpected signer: $f"; exit 1; }
             done
             rm "$dir/SHA256SUMS"
           done
