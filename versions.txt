@@ -1,0 +1,5 @@
+# Release tags whose signed Windows MSIs are mirrored on GitHub Pages for the
+# Microsoft Store (which needs direct, non-redirecting download URLs).
+# Keep old entries: every deploy replaces the whole site, and the Store may
+# re-fetch the URL of any version it has accepted.
+v0.0.12
