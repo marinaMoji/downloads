@@ -42,12 +42,14 @@ jobs:
             # the pinned Certum CA bundle (with a verified timestamp, so it stays
             # valid after the certificate expires) AND was made by the project's
             # signing certificate. Merely containing a signature is not enough:
-            # this is what the Microsoft Store will fetch.
+            # this is what the Microsoft Store will fetch. (osslsigncode prints the
+            # subject as "CN=...,O=..." or "/C=.../CN=..." depending on version,
+            # so match the common name, ending at a separator or end of line.)
             for f in "$dir"/*.msi; do
               out=$(osslsigncode verify -CAfile ca/verify-bundle.pem \
                       -TSA-CAfile ca/verify-bundle.pem -in "$f" 2>&1) \
                 || { echo "$out"; echo "invalid or missing signature: $f"; exit 1; }
-              grep -q 'Subject: CN=Open Source Developer Daniel Patrick Morgan,' <<<"$out" \
+              grep -qE 'CN=Open Source Developer Daniel Patrick Morgan([,/]|$)' <<<"$out" \
                 || { echo "$out"; echo "unexpected signer: $f"; exit 1; }
             done
             rm "$dir/SHA256SUMS"
