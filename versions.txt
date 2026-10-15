@@ -3,3 +3,4 @@
 # Keep old entries: every deploy replaces the whole site, and the Store may
 # re-fetch the URL of any version it has accepted.
 v0.0.12
+v0.0.13
